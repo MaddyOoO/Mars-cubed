@@ -1,0 +1,95 @@
+#include <Adafruit_Sensor.h>
+
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
+
+// Betriebsmodi manuell definiert
+#define OPERATION_MODE_NDOF 0x0C
+
+Adafruit_BNO055 bno = Adafruit_BNO055();
+
+const int ventilLinks = 7;
+const int ventilRechts = 8;
+
+const float schwellwert = 5.0;
+const float stillstandSchwelle = 0.1;
+const unsigned long stillstandTimeout = 5000; // 5 Sekunden (kürzer für schnellere Erkennung)
+const unsigned long abfrageIntervall = 100; // 10 Hz Abfrage
+const unsigned long serialIntervall = 500; // 2 Hz Serielle Ausgabe
+
+unsigned long letzteBewegung = 0;
+unsigned long letzteAbfrage = 0;x
+unsigned long letzteSerial = 0;
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(ventilLinks, OUTPUT);
+  pinMode(ventilRechts, OUTPUT);
+  digitalWrite(ventilLinks, LOW);
+  digitalWrite(ventilRechts, LOW);
+
+  if (!bno.begin()) {
+    Serial.println("BNO055 nicht gefunden!");
+    while (1);
+  }
+
+  bno.setExtCrystalUse(true);
+  bno.setMode(OPERATION_MODE_NDOF);
+  delay(1000);
+
+  letzteBewegung = millis();
+}
+
+void loop() {
+  unsigned long jetzt = millis();
+
+  if (jetzt - letzteAbfrage >= abfrageIntervall) {
+    letzteAbfrage = jetzt;
+
+    imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
+    float z = gyro.z();
+
+    // Nur selten Serial-Ausgabe
+    if (jetzt - letzteSerial >= serialIntervall) {
+      letzteSerial = jetzt;
+      Serial.print("Drehgeschwindigkeit Z: ");
+      Serial.println(z);
+    }
+
+    if (abs(z) > stillstandSchwelle) {
+      letzteBewegung = jetzt;
+    }
+
+    if (z > schwellwert) {
+      digitalWrite(ventilLinks, HIGH);
+      digitalWrite(ventilRechts, LOW);
+    } else if (z < -schwellwert) {
+      digitalWrite(ventilLinks, LOW);
+      digitalWrite(ventilRechts, HIGH);
+    } else {
+      digitalWrite(ventilLinks, LOW);
+      digitalWrite(ventilRechts, LOW);
+    }
+  }
+
+  if (jetzt - letzteBewegung > stillstandTimeout) {
+    Serial.println("Sensor hängt? Versuche Reinitialisierung...");
+    reinitialisiereSensor();
+    letzteBewegung = millis();
+  }
+}
+
+void reinitialisiereSensor() {
+  Serial.println("Initialisiere Sensor neu...");
+  // Harte Reinitialisierung
+  bno = Adafruit_BNO055();  // Objekt neu erzeugen
+  if (!bno.begin()) {
+    Serial.println("Sensor konnte nicht reinitialisiert werden!");
+    while (1);
+  }
+  bno.setExtCrystalUse(true);
+  bno.setMode(OPERATION_MODE_NDOF);
+  delay(1000);
+}
