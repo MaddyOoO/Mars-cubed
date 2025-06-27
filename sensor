@@ -1,0 +1,65 @@
+import smbus
+import time
+
+bus = smbus.SMBus(1)
+MPL3115A2_ADDR = 0x60
+CTRL_REG1 = 0x26
+PT_DATA_CFG = 0x13
+
+# Enable data ready events
+bus.write_byte_data(MPL3115A2_ADDR, PT_DATA_CFG, 0x07)
+
+def set_mode(altimeter=True):
+    mode = 0xB8 if altimeter else 0x38  # ALT + active or BAR + active
+    bus.write_byte_data(MPL3115A2_ADDR, CTRL_REG1, mode)
+
+def read_data():
+    # Trigger measurement
+    bus.write_byte_data(MPL3115A2_ADDR, CTRL_REG1, bus.read_byte_data(MPL3115A2_ADDR, CTRL_REG1) | 0x01)
+    time.sleep(0.1)
+    data = bus.read_i2c_block_data(MPL3115A2_ADDR, 0x00, 6)
+    return data
+
+def parse_altitude_temp(data):
+    alt = (data[1] << 8) | data[2]
+    alt_frac = data[3] / 256.0
+    if alt > 32767:
+        alt -= 65536
+    altitude = alt + alt_frac
+
+    temp = (data[4] << 8 | data[5]) >> 4
+    if temp > 2047:
+        temp -= 4096
+    temperature = temp / 16.0
+
+    return altitude, temperature
+
+def parse_pressure_temp(data):
+    pressure = ((data[1] << 16) | (data[2] << 8) | data[3]) >> 4
+    pressure_hPa = pressure / 4.0
+
+    temp = (data[4] << 8 | data[5]) >> 4
+    if temp > 2047:
+        temp -= 4096
+    temperature = temp / 16.0
+
+    return pressure_hPa, temperature
+
+# Main loop
+try:
+    while True:
+        # Read altitude + temp
+        set_mode(altimeter=True)
+        data = read_data()
+        altitude, temp1 = parse_altitude_temp(data)
+
+        # Read pressure + temp
+        set_mode(altimeter=False)
+        data = read_data()
+        pressure, temp2 = parse_pressure_temp(data)
+
+        print(f"Altitude: {altitude:.2f} m | Pressure: {pressure:.2f} hPa | Temp: {temp1:.2f} °C")
+
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("\nStopped by user.")
