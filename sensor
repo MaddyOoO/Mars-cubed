@@ -5,18 +5,44 @@ bus = smbus.SMBus(1)
 MPL3115A2_ADDR = 0x60
 CTRL_REG1 = 0x26
 PT_DATA_CFG = 0x13
+STATUS = 0x00
 
-# Enable data ready events
-bus.write_byte_data(MPL3115A2_ADDR, PT_DATA_CFG, 0x07)
+def write_ctrl_reg1(value):
+    bus.write_byte_data(MPL3115A2_ADDR, CTRL_REG1, value)
+
+def read_status():
+    return bus.read_byte_data(MPL3115A2_ADDR, STATUS)
+
+def init_sensor():
+    bus.write_byte_data(MPL3115A2_ADDR, PT_DATA_CFG, 0x07)  # Enable data flags
+    ctrl = bus.read_byte_data(MPL3115A2_ADDR, CTRL_REG1)
+    ctrl &= ~0x01  # Ensure SBYB = 0
+    write_ctrl_reg1(ctrl)
 
 def set_mode(altimeter=True):
-    mode = 0xB8 if altimeter else 0x38  # ALT + active or BAR + active
-    bus.write_byte_data(MPL3115A2_ADDR, CTRL_REG1, mode)
+    ctrl = bus.read_byte_data(MPL3115A2_ADDR, CTRL_REG1)
+    ctrl &= ~(0x80)  # Clear ALT bit
+    if altimeter:
+        ctrl |= 0x80  # Set ALT bit for Altimeter mode
+    ctrl |= 0x38  # Set OSR = 128
+    ctrl &= ~0x01  # SBYB = 0 (standby)
+    write_ctrl_reg1(ctrl)
+    time.sleep(0.1)
+
+def trigger_measurement():
+    ctrl = bus.read_byte_data(MPL3115A2_ADDR, CTRL_REG1)
+    ctrl |= 0x01  # SBYB = 1 (active)
+    write_ctrl_reg1(ctrl)
+
+def wait_for_data():
+    for _ in range(10):
+        status = read_status()
+        if status & 0x08:  # Check if new data is ready
+            return True
+        time.sleep(0.05)
+    return False
 
 def read_data():
-    # Trigger measurement
-    bus.write_byte_data(MPL3115A2_ADDR, CTRL_REG1, bus.read_byte_data(MPL3115A2_ADDR, CTRL_REG1) | 0x01)
-    time.sleep(0.1)
     data = bus.read_i2c_block_data(MPL3115A2_ADDR, 0x00, 6)
     return data
 
@@ -45,21 +71,32 @@ def parse_pressure_temp(data):
 
     return pressure_hPa, temperature
 
-# Main loop
+# Initialize
+init_sensor()
+
 try:
     while True:
-        # Read altitude + temp
+        # Altimeter mode
         set_mode(altimeter=True)
-        data = read_data()
-        altitude, temp1 = parse_altitude_temp(data)
+        trigger_measurement()
+        if wait_for_data():
+            data = read_data()
+            altitude, temp1 = parse_altitude_temp(data)
+        else:
+            altitude, temp1 = 0, 0
 
-        # Read pressure + temp
+        # Barometer mode
         set_mode(altimeter=False)
-        data = read_data()
-        pressure, temp2 = parse_pressure_temp(data)
+        trigger_measurement()
+        if wait_for_data():
+            data = read_data()
+            pressure, temp2 = parse_pressure_temp(data)
+        else:
+            pressure, temp2 = 0, 0
 
         print(f"Altitude: {altitude:.2f} m | Pressure: {pressure:.2f} hPa | Temp: {temp1:.2f} °C")
 
         time.sleep(1)
+
 except KeyboardInterrupt:
     print("\nStopped by user.")
