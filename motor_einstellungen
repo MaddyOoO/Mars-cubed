@@ -1,0 +1,95 @@
+# -*- coding: utf-8 -*-
+import RPi.GPIO as GPIO
+import time 
+
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+#Mitte Links
+IN1 = 14 
+IN2 = 15
+#Mitte Rechts
+IN3 = 17 
+IN4 = 18
+#Links
+IN5 = 23
+IN6 = 24
+#Rechts
+IN7 = 22
+IN8 = 27
+
+GPIO.setup(IN1, GPIO.OUT)
+GPIO.setup(IN2, GPIO.OUT)
+GPIO.setup(IN3, GPIO.OUT)
+GPIO.setup(IN4, GPIO.OUT)
+GPIO.setup(IN5, GPIO.OUT)
+GPIO.setup(IN6, GPIO.OUT)
+GPIO.setup(IN7, GPIO.OUT)
+GPIO.setup(IN8, GPIO.OUT)
+
+# Stoppt nur linke Seite (Mitte Links + Links)
+def stop_links():
+    for pin in [IN1, IN2, IN5, IN6]:
+        GPIO.output(pin, GPIO.LOW)
+
+# Stoppt nur rechte Seite (Mitte Rechts + Rechts)
+def stop_rechts():
+    for pin in [IN3, IN4, IN7, IN8]:
+        GPIO.output(pin, GPIO.LOW)
+
+# Alle Motoren vorwarts
+def forward():
+    GPIO.output(IN1, GPIO.HIGH)
+    GPIO.output(IN2, GPIO.LOW)
+    GPIO.output(IN3, GPIO.HIGH)
+    GPIO.output(IN4, GPIO.LOW)
+    GPIO.output(IN5, GPIO.HIGH)
+    GPIO.output(IN6, GPIO.LOW)
+    GPIO.output(IN7, GPIO.HIGH)
+    GPIO.output(IN8, GPIO.LOW)
+
+# Alle Motoren ruckwarts
+def reverse():
+    GPIO.output(IN1, GPIO.LOW)
+    GPIO.output(IN2, GPIO.HIGH)
+    GPIO.output(IN3, GPIO.LOW)
+    GPIO.output(IN4, GPIO.HIGH)
+    GPIO.output(IN5, GPIO.LOW)
+    GPIO.output(IN6, GPIO.HIGH)
+    GPIO.output(IN7, GPIO.LOW)
+    GPIO.output(IN8, GPIO.HIGH)
+
+# slow  Mitte ruckwarts, Rechts vorwärts
+def sforward():
+    GPIO.output(IN1, GPIO.LOW)
+    GPIO.output(IN2, GPIO.HIGH)
+    GPIO.output(IN3, GPIO.LOW)
+    GPIO.output(IN4, GPIO.HIGH)
+    GPIO.output(IN7, GPIO.HIGH)
+    GPIO.output(IN8, GPIO.LOW)
+
+# slow Mitte vorwrts, Rechts rckwrts
+def sreverse():
+    GPIO.output(IN1, GPIO.HIGH)
+    GPIO.output(IN2, GPIO.LOW)
+    GPIO.output(IN3, GPIO.HIGH)
+    GPIO.output(IN4, GPIO.LOW)
+    GPIO.output(IN7, GPIO.LOW)
+    GPIO.output(IN8, GPIO.HIGH)
+
+# Nur linke Seite vorwarts (Mitte Links + Links)
+def forward_links():
+    GPIO.output(IN1, GPIO.HIGH)
+    GPIO.output(IN2, GPIO.LOW)
+    GPIO.output(IN5, GPIO.HIGH)
+    GPIO.output(IN6, GPIO.LOW)
+
+# Nur rechte Seite vorwarts (Mitte Rechts + Rechts)
+def forward_rechts():
+    GPIO.output(IN3, GPIO.HIGH)
+    GPIO.output(IN4, GPIO.LOW)
+    GPIO.output(IN7, GPIO.HIGH)
+    GPIO.output(IN8, GPIO.LOW)
+
+
+
+GPIO.cleanup()
