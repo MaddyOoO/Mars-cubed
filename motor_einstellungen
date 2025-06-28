@@ -91,5 +91,7 @@ def forward_rechts():
     GPIO.output(IN8, GPIO.LOW)
 
 
-
+forward()
+sleep(10)
+stop()
 GPIO.cleanup()
